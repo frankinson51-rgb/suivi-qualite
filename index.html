@@ -1,0 +1,941 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Suivi Qualité — Ligne Lavage</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+  :root{
+    --bg-deep:#12161F;
+    --surface:#1B212C;
+    --surface-raised:#242C39;
+    --border:#333E4E;
+    --text-primary:#EDEFF3;
+    --text-muted:#8B95A6;
+    --accent-safety:#F4A825;
+    --accent-safety-dim:#4a3c1a;
+    --accent-ok:#34C77B;
+    --accent-ok-dim:#173026;
+    --accent-danger:#E5484D;
+    --accent-danger-dim:#3a1e20;
+    --radius:10px;
+    --font-display:'Oswald', sans-serif;
+    --font-body:'IBM Plex Sans', sans-serif;
+    --font-mono:'IBM Plex Mono', monospace;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--bg-deep);
+    color:var(--text-primary);
+    font-family:var(--font-body);
+    background-image:
+      linear-gradient(var(--bg-deep), var(--bg-deep)),
+      repeating-linear-gradient(135deg, rgba(244,168,37,0.025) 0 2px, transparent 2px 14px);
+    min-height:100vh;
+  }
+  .app{max-width:1320px;margin:0 auto;padding:24px 24px 60px;}
+
+  /* ---- Topbar ---- */
+  .topbar{
+    display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:16px;
+    padding-bottom:20px;margin-bottom:22px;border-bottom:2px solid var(--border);
+  }
+  .brand{display:flex;align-items:center;gap:14px;}
+  .brand-mark{
+    width:42px;height:42px;border:2px solid var(--accent-safety);border-radius:6px;
+    display:flex;align-items:center;justify-content:center;color:var(--accent-safety);
+    font-family:var(--font-display);font-size:20px;font-weight:700;flex-shrink:0;
+    background:repeating-linear-gradient(45deg, var(--accent-safety-dim) 0 4px, transparent 4px 8px);
+  }
+  .brand h1{
+    font-family:var(--font-display);font-weight:700;font-size:22px;letter-spacing:0.03em;
+    margin:0;text-transform:uppercase;
+  }
+  .brand p{margin:2px 0 0;color:var(--text-muted);font-size:13px;}
+  .kpi-strip{display:flex;gap:10px;flex-wrap:wrap;}
+  .kpi{
+    background:var(--surface);border:1px solid var(--border);border-radius:8px;
+    padding:8px 16px;min-width:96px;text-align:center;
+  }
+  .kpi .val{font-family:var(--font-mono);font-size:22px;font-weight:600;line-height:1;}
+  .kpi .lbl{font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.06em;margin-top:4px;}
+  .kpi.warn .val{color:var(--accent-safety);}
+  .kpi.ok .val{color:var(--accent-ok);}
+  .kpi.danger .val{color:var(--accent-danger);}
+
+  /* ---- Layout ---- */
+  .layout{display:grid;grid-template-columns:340px 1fr;gap:20px;align-items:start;}
+  @media (max-width:880px){.layout{grid-template-columns:1fr;}}
+
+  .panel{
+    background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+    padding:20px;
+  }
+  .panel-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:10px;}
+  .panel-head h2{font-family:var(--font-display);font-size:16px;text-transform:uppercase;letter-spacing:0.03em;margin:0;font-weight:600;}
+  .ticket-no{font-family:var(--font-mono);font-size:11px;color:var(--accent-safety);letter-spacing:0.05em;}
+
+  /* ---- Form ---- */
+  label{display:block;font-size:12px;color:var(--text-muted);margin-bottom:4px;margin-top:14px;text-transform:uppercase;letter-spacing:0.03em;}
+  label:first-of-type{margin-top:0;}
+  input,select{
+    width:100%;background:var(--surface-raised);border:1px solid var(--border);color:var(--text-primary);
+    padding:9px 10px;border-radius:6px;font-family:var(--font-body);font-size:14px;
+  }
+  input:focus,select:focus{outline:none;border-color:var(--accent-safety);}
+  input[type="date"],input[type="number"]{font-family:var(--font-mono);}
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  button{
+    font-family:var(--font-body);font-weight:600;font-size:13px;border:none;border-radius:6px;
+    padding:10px 16px;cursor:pointer;transition:filter .15s;
+  }
+  button:hover{filter:brightness(1.1);}
+  .btn-primary{background:var(--accent-safety);color:#1a1200;width:100%;margin-top:18px;font-size:14px;}
+  .btn-resolve{background:var(--accent-ok);color:#04150c;}
+  .btn-ghost{background:transparent;border:1px solid var(--border);color:var(--text-muted);}
+  .btn-danger{background:transparent;border:1px solid var(--accent-danger);color:var(--accent-danger);}
+  .btn-small{padding:5px 10px;font-size:12px;}
+
+  /* ---- Filters ---- */
+  .filters{display:flex;gap:8px;flex-wrap:wrap;}
+  .filters select,.filters input{width:auto;font-size:12px;padding:6px 8px;}
+
+  /* ---- Table ---- */
+  .table-wrap{overflow-x:auto;}
+  table{width:100%;border-collapse:collapse;font-size:13px;}
+  th{
+    text-align:left;color:var(--text-muted);font-size:10px;text-transform:uppercase;letter-spacing:0.05em;
+    padding:8px 10px;border-bottom:1px solid var(--border);font-weight:600;white-space:nowrap;
+  }
+  td{padding:9px 10px;border-bottom:1px solid rgba(255,255,255,0.05);vertical-align:middle;white-space:nowrap;}
+  tr:hover td{background:rgba(255,255,255,0.02);}
+  .mono{font-family:var(--font-mono);}
+  .status-pill{
+    display:inline-block;padding:3px 9px;border-radius:20px;font-size:11px;font-weight:600;text-transform:uppercase;
+  }
+  .status-pill.open{background:var(--accent-danger-dim);color:var(--accent-danger);}
+  .status-pill.resolved{background:var(--accent-ok-dim);color:var(--accent-ok);}
+
+  /* signature stamp */
+  .stamp{
+    display:inline-flex;flex-direction:column;align-items:center;justify-content:center;
+    width:56px;height:56px;border:2px dashed var(--accent-ok);border-radius:50%;
+    color:var(--accent-ok);transform:rotate(-9deg);font-family:var(--font-display);
+    text-align:center;line-height:1.1;flex-shrink:0;
+  }
+  .stamp span{font-size:8px;letter-spacing:0.04em;}
+  .stamp b{font-size:9px;font-family:var(--font-mono);}
+  .empty-stamp{width:56px;height:56px;flex-shrink:0;}
+
+  .empty-state{color:var(--text-muted);text-align:center;padding:30px;font-size:13px;}
+
+  /* resolve modal */
+  .modal-backdrop{
+    position:fixed;inset:0;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;
+    z-index:50;padding:20px;
+  }
+  .modal{
+    background:var(--surface-raised);border:1px solid var(--border);border-radius:var(--radius);
+    padding:22px;max-width:380px;width:100%;
+  }
+  .modal h3{margin:0 0 4px;font-family:var(--font-display);text-transform:uppercase;font-size:15px;}
+  .modal .sub{color:var(--text-muted);font-size:12px;margin-bottom:14px;}
+  .modal-actions{display:flex;gap:10px;margin-top:18px;}
+  .modal-actions button{flex:1;}
+
+  .chart-panel{margin-top:20px;}
+  .chart-inner{height:220px;}
+  .charts-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;}
+  @media (max-width:880px){.charts-grid{grid-template-columns:1fr;}}
+  .hint{font-size:11px;color:var(--accent-safety);margin-top:4px;display:none;}
+  .hint.show{display:block;}
+  .matrix-panel{margin-top:20px;}
+  .matrix-table th{white-space:normal;}
+  .matrix-count{font-family:var(--font-mono);font-weight:600;color:var(--accent-safety);}
+  .matrix-empty{color:var(--text-muted);font-size:12px;padding:16px;text-align:center;}
+
+  .loading-note{color:var(--text-muted);font-size:12px;padding:20px;text-align:center;}
+
+  /* ---- Confirmation d'enregistrement ---- */
+  .confirm-pill{
+    display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:20px;
+    font-size:11px;font-weight:600;text-transform:uppercase;background:var(--accent-ok-dim);color:var(--accent-ok);
+    white-space:nowrap;
+  }
+  .btn-confirm{background:var(--surface-raised);border:1px solid var(--accent-ok);color:var(--accent-ok);}
+
+  /* ---- Toast de confirmation ---- */
+  .toast{
+    position:fixed;bottom:24px;right:24px;background:var(--accent-ok-dim);border:1px solid var(--accent-ok);
+    color:var(--accent-ok);padding:12px 18px;border-radius:8px;font-size:13px;font-weight:600;
+    display:flex;align-items:center;gap:10px;z-index:100;box-shadow:0 6px 20px rgba(0,0,0,0.4);
+    opacity:0;transform:translateY(10px);transition:opacity .25s, transform .25s;pointer-events:none;
+  }
+  .toast.show{opacity:1;transform:translateY(0);}
+  .toast .icon{
+    width:20px;height:20px;border-radius:50%;background:var(--accent-ok);color:#04150c;
+    display:flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0;
+  }
+
+  /* ---- Analyse par tranche de réclamations ---- */
+  .progress-note{color:var(--text-muted);font-size:12px;padding:16px;text-align:center;}
+  .progress-note b{color:var(--accent-safety);font-family:var(--font-mono);}
+  .percent-chart-wrap{display:flex;gap:24px;align-items:center;flex-wrap:wrap;}
+  .percent-chart-wrap .chart-inner{flex:1 1 260px;height:240px;min-width:220px;}
+  .percent-legend{flex:1 1 200px;display:flex;flex-direction:column;gap:8px;}
+  .percent-legend-row{display:flex;align-items:center;gap:8px;font-size:12px;}
+  .percent-legend-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;}
+  .percent-legend-label{flex:1;color:var(--text-primary);}
+  .percent-legend-value{font-family:var(--font-mono);color:var(--text-muted);}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-mark">QC</div>
+      <div>
+        <h1>Suivi Qualité — Ligne Lavage</h1>
+        <p class="subtitle">Registre partagé — connecté au serveur central (réseau Technical Plastic)</p>
+      </div>
+    </div>
+    <div class="kpi-strip" id="kpiStrip"></div>
+  </header>
+
+  <main class="layout">
+
+    <section class="panel form-panel">
+      <div class="panel-head">
+        <h2>Nouvelle fiche</h2>
+        <span class="ticket-no" id="ticketPreview">N° 000000</span>
+      </div>
+      <form id="defectForm">
+        <label for="f-date">Date constat</label>
+        <input type="date" id="f-date" required>
+
+        <div class="row2">
+          <div>
+            <label for="f-matricule-controleur">Matricule contrôleur</label>
+            <input type="text" id="f-matricule-controleur" list="dl-controleurs" placeholder="ex: C-014" required>
+          </div>
+          <div>
+            <label for="f-matricule-operateur">Matricule opérateur</label>
+            <input type="text" id="f-matricule-operateur" list="dl-operateurs" placeholder="ex: O-231" required>
+          </div>
+        </div>
+
+        <label>Type de machine à laver</label>
+        <select id="f-capacite" required>
+          <option value="">Capacité…</option>
+        </select>
+        <select id="f-modele" required disabled style="margin-top:8px;">
+          <option value="">Modèle…</option>
+        </select>
+        <select id="f-materiau" disabled style="margin-top:8px;">
+          <option value="">Matériau…</option>
+        </select>
+
+        <label>Problème rencontré</label>
+        <select id="f-probleme" required>
+          <option value="">Problème…</option>
+        </select>
+        <select id="f-variation" required disabled style="margin-top:8px;">
+          <option value="">Variation…</option>
+        </select>
+
+        <label for="f-poste">Poste responsable</label>
+        <input type="text" id="f-poste" list="dl-postes" placeholder="ex: Poste Montage Tambour" required>
+        <div class="hint" id="posteHint">Suggéré à partir des fiches précédentes pour ce défaut — modifiable.</div>
+
+        <label for="f-quantite">Quantité affectée</label>
+        <input type="number" id="f-quantite" min="1" value="1" required>
+
+        <datalist id="dl-controleurs"></datalist>
+        <datalist id="dl-operateurs"></datalist>
+        <datalist id="dl-postes">
+          <option value="Poste Montage Tambour">
+          <option value="Poste Câblage Électrique">
+          <option value="Poste Assemblage Carrosserie">
+          <option value="Poste Montage Moteur">
+          <option value="Poste Plomberie / Circuit Eau">
+          <option value="Poste Test Fonctionnel">
+          <option value="Poste Emballage">
+        </datalist>
+
+        <button type="submit" class="btn-primary">Créer la fiche</button>
+      </form>
+    </section>
+
+    <section class="panel log-panel">
+      <div class="panel-head">
+        <h2>Registre des fiches</h2>
+        <div class="filters">
+          <select id="filter-status">
+            <option value="">Tous statuts</option>
+            <option value="Ouverte">Ouvertes</option>
+            <option value="Résolue">Résolues</option>
+          </select>
+          <input type="text" id="filter-search" placeholder="Rechercher article / défaut / matricule…">
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>N°</th><th>Date</th><th>Contrôleur</th><th>Article</th><th>Défaut</th>
+              <th>Poste responsable</th><th>Qté</th><th>Opérateur</th><th>Statut</th><th>Temps réparation</th><th>Visa final</th><th>Enregistrement</th><th></th>
+            </tr>
+          </thead>
+          <tbody id="logBody"></tbody>
+        </table>
+        <div id="emptyState" class="empty-state" style="display:none;">Aucune fiche pour le moment. Créez la première à gauche.</div>
+      </div>
+    </section>
+
+  </main>
+
+  <section class="chart-panel charts-grid">
+    <div class="panel">
+      <div class="panel-head"><h2>Répartition des défauts par nature</h2></div>
+      <div class="chart-inner"><canvas id="defectChart"></canvas></div>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><h2>Répartition par poste responsable</h2></div>
+      <div class="chart-inner"><canvas id="posteChart"></canvas></div>
+    </div>
+  </section>
+
+  <section class="panel chart-panel" id="percentPanel">
+    <div class="panel-head">
+      <h2>Répartition des problèmes (%)</h2>
+      <span class="ticket-no" id="percentPanelSub">Analyse par tranche de 15 réclamations</span>
+    </div>
+    <div id="percentPanelBody"></div>
+  </section>
+
+  <section class="panel matrix-panel">
+    <div class="panel-head">
+      <h2>Matrice défaut ↔ poste responsable</h2>
+      <span class="ticket-no">Associations les plus fréquentes</span>
+    </div>
+    <div class="table-wrap">
+      <table class="matrix-table">
+        <thead>
+          <tr><th>Nature du défaut</th><th>Poste responsable</th><th>Occurrences</th><th>Quantité cumulée</th></tr>
+        </thead>
+        <tbody id="matrixBody"></tbody>
+      </table>
+      <div id="matrixEmpty" class="matrix-empty" style="display:none;">Aucune association encore enregistrée.</div>
+    </div>
+  </section>
+
+</div>
+
+<div id="modalRoot"></div>
+<div class="toast" id="toast"><span class="icon">✓</span><span id="toastMsg">Enregistré avec succès</span></div>
+
+<script>
+const API_BASE = '/api/fiches';
+// Rafraîchissement automatique du registre pour rester synchronisé entre plusieurs tablettes
+const AUTO_REFRESH_MS = 5000;
+let records = [];
+let chartInstance = null;
+let posteChartInstance = null;
+let percentChartInstance = null;
+const RECLAMATION_THRESHOLD = 15; // seuil de réclamations avant l'analyse en pourcentage
+
+// ---- Arborescence des machines : Capacité -> Modèle -> Matériaux disponibles ----
+const MACHINE_TREE = {
+  "7 kg": {
+    models: {
+      "B75": { materials: null },
+      "A75": { materials: null }
+    }
+  },
+  "10 kg": {
+    models: {
+      "AB": { materials: ["Plastique","Verre"] },
+      "BX": { materials: ["Plastique","Verre"] },
+      "AC": { materials: ["Plastique"] }
+    }
+  },
+  "12 kg": {
+    models: {
+      "AX": { materials: ["Plastique","Verre"] },
+      "AY": { materials: ["Plastique"] }
+    }
+  },
+  "13 kg": {
+    models: {
+      "110-A": { materials: ["Verre"] },
+      "110-2": { materials: ["Plastique"] },
+      "110-3": { materials: ["Verre"] }
+    }
+  }
+};
+
+// ---- Arborescence des défauts : Problème -> Variations (à ajuster selon vos catégories réelles) ----
+const DEFAUT_TREE = {
+  "Fuite d'eau": ["Fuite au niveau du tambour","Fuite au joint de porte","Fuite au tuyau d'arrivée","Fuite à la pompe de vidange"],
+  "Défaut moteur": ["Moteur ne démarre pas","Moteur bruyant","Surchauffe moteur","Vibrations excessives"],
+  "Défaut électrique": ["Court-circuit","Carte électronique défaillante","Câblage endommagé","Panne d'alimentation"],
+  "Défaut de montage": ["Vis mal serrée","Panneau mal fixé","Pièce manquante","Alignement incorrect"],
+  "Défaut tambour": ["Tambour désaxé","Roulement usé","Bruit anormal en rotation"],
+  "Autre": ["Autre (à préciser)"]
+};
+
+function todayStr(){ return new Date().toISOString().slice(0,10); }
+
+function fmtDate(d){
+  if(!d) return '—';
+  const [y,m,day] = d.split('-');
+  return `${day}/${m}/${y}`;
+}
+
+async function loadRecords(silent){
+  const body = document.getElementById('logBody');
+  if(!silent) body.innerHTML = '<tr><td colspan="13" class="loading-note">Chargement du registre partagé…</td></tr>';
+  try{
+    const res = await fetch(API_BASE);
+    if(!res.ok) throw new Error('HTTP ' + res.status);
+    records = await res.json();
+  }catch(e){
+    if(!silent){
+      body.innerHTML = '<tr><td colspan="13" class="loading-note">Impossible de joindre le serveur. Vérifiez la connexion Wi-Fi (Technical Plastic) et réessayez.</td></tr>';
+    }
+    return;
+  }
+  render();
+}
+
+// Rafraîchit discrètement en arrière-plan pour voir les fiches créées/résolues par d'autres postes
+setInterval(()=>loadRecords(true), AUTO_REFRESH_MS);
+
+function nextTicketNumber(){
+  const max = records.reduce((m,r)=>Math.max(m, r.id||0), 0);
+  return max + 1;
+}
+
+function pad(n){ return String(n).padStart(6,'0'); }
+
+function updateTicketPreview(){
+  document.getElementById('ticketPreview').textContent = 'N° ' + pad(nextTicketNumber());
+}
+
+function uniqueValues(field){
+  return [...new Set(records.map(r=>r[field]).filter(Boolean))];
+}
+
+function refreshDatalists(){
+  const map = {
+    'dl-controleurs':'matriculeControleur',
+    'dl-operateurs':'matriculeOperateur'
+  };
+  for(const [id, field] of Object.entries(map)){
+    const dl = document.getElementById(id);
+    dl.innerHTML = uniqueValues(field).map(v=>`<option value="${escapeHtml(v)}">`).join('');
+  }
+  // postes datalist keeps the seed suggestions and adds any new ones typed by the team
+  const dlPostes = document.getElementById('dl-postes');
+  const seedPostes = ["Poste Montage Tambour","Poste Câblage Électrique","Poste Assemblage Carrosserie",
+    "Poste Montage Moteur","Poste Plomberie / Circuit Eau","Poste Test Fonctionnel","Poste Emballage"];
+  const allPostes = [...new Set([...seedPostes, ...uniqueValues('poste')])];
+  dlPostes.innerHTML = allPostes.map(v=>`<option value="${escapeHtml(v)}">`).join('');
+}
+
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+let toastTimer = null;
+function showToast(msg){
+  const toast = document.getElementById('toast');
+  document.getElementById('toastMsg').textContent = msg;
+  toast.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=>toast.classList.remove('show'), 2600);
+}
+
+function computeKPIs(){
+  const total = records.length;
+  const open = records.filter(r=>r.status==='Ouverte').length;
+  const resolved = records.filter(r=>r.status==='Résolue').length;
+  const times = records.filter(r=>r.status==='Résolue' && r.tempsReparation).map(r=>Number(r.tempsReparation));
+  const avg = times.length ? Math.round(times.reduce((a,b)=>a+b,0)/times.length) : 0;
+  const posteCounts = {};
+  records.forEach(r=>{ if(r.poste) posteCounts[r.poste] = (posteCounts[r.poste]||0)+1; });
+  let topPoste = '—';
+  let topPosteCount = 0;
+  Object.entries(posteCounts).forEach(([p,c])=>{ if(c>topPosteCount){ topPoste=p; topPosteCount=c; } });
+  return {total, open, resolved, avg, topPoste, topPosteCount};
+}
+
+function renderKPIs(){
+  const k = computeKPIs();
+  document.getElementById('kpiStrip').innerHTML = `
+    <div class="kpi"><div class="val">${k.total}</div><div class="lbl">Fiches</div></div>
+    <div class="kpi danger"><div class="val">${k.open}</div><div class="lbl">Ouvertes</div></div>
+    <div class="kpi ok"><div class="val">${k.resolved}</div><div class="lbl">Résolues</div></div>
+    <div class="kpi warn"><div class="val">${k.avg}</div><div class="lbl">Min. moy. réparation</div></div>
+    <div class="kpi warn"><div class="val" style="font-size:14px;">${escapeHtml(k.topPoste)}</div><div class="lbl">Poste le plus touché (${k.topPosteCount})</div></div>
+  `;
+}
+
+function matchesFilters(r){
+  const status = document.getElementById('filter-status').value;
+  const search = document.getElementById('filter-search').value.trim().toLowerCase();
+  if(status && r.status !== status) return false;
+  if(search){
+    const hay = [r.article, r.defaut, r.matriculeControleur, r.matriculeOperateur].join(' ').toLowerCase();
+    if(!hay.includes(search)) return false;
+  }
+  return true;
+}
+
+function renderTable(){
+  const body = document.getElementById('logBody');
+  const empty = document.getElementById('emptyState');
+  const filtered = records.filter(matchesFilters).sort((a,b)=>b.id-a.id);
+
+  if(records.length===0){
+    body.innerHTML='';
+    empty.style.display='block';
+    return;
+  }
+  empty.style.display='none';
+
+  body.innerHTML = filtered.map(r=>{
+    const stampCell = r.status==='Résolue'
+      ? `<div class="stamp"><span>CONTRÔLÉ</span><b>${escapeHtml(r.visaControleurFinal||'')}</b><span>${fmtDate(r.dateVisa)}</span></div>`
+      : `<div class="empty-stamp"></div>`;
+    const actionBtn = r.status==='Ouverte'
+      ? `<button class="btn-resolve btn-small" onclick="openResolveModal(${r.id})">Résoudre</button>`
+      : `<button class="btn-ghost btn-small" onclick="deleteRecord(${r.id})">Suppr.</button>`;
+    const confirmCell = r.confirmed
+      ? `<span class="confirm-pill">✓ Enregistré</span>`
+      : `<button class="btn-confirm btn-small" onclick="confirmSaved(${r.id})">Confirmer</button>`;
+    return `<tr>
+      <td class="mono">${pad(r.id)}</td>
+      <td class="mono">${fmtDate(r.date)}</td>
+      <td class="mono">${escapeHtml(r.matriculeControleur)}</td>
+      <td>${escapeHtml(r.article)}</td>
+      <td>${escapeHtml(r.defaut)}</td>
+      <td>${escapeHtml(r.poste||'—')}</td>
+      <td class="mono">${r.quantite}</td>
+      <td class="mono">${escapeHtml(r.matriculeOperateur)}</td>
+      <td><span class="status-pill ${r.status==='Ouverte'?'open':'resolved'}">${r.status}</span></td>
+      <td class="mono">${r.tempsReparation ? r.tempsReparation+' min' : '—'}</td>
+      <td>${stampCell}</td>
+      <td>${confirmCell}</td>
+      <td>${actionBtn}</td>
+    </tr>`;
+  }).join('');
+}
+
+function renderChart(){
+  const counts = {};
+  records.forEach(r=>{ counts[r.defaut] = (counts[r.defaut]||0) + Number(r.quantite||1); });
+  const labels = Object.keys(counts);
+  const data = Object.values(counts);
+  const ctx = document.getElementById('defectChart').getContext('2d');
+  if(chartInstance) chartInstance.destroy();
+  chartInstance = new Chart(ctx, {
+    type:'bar',
+    data:{
+      labels,
+      datasets:[{
+        data,
+        backgroundColor:'#F4A825',
+        borderRadius:4,
+        maxBarThickness:36
+      }]
+    },
+    options:{
+      responsive:true,
+      maintainAspectRatio:false,
+      plugins:{legend:{display:false}},
+      scales:{
+        x:{ticks:{color:'#8B95A6', font:{family:'IBM Plex Sans', size:11}}, grid:{display:false}},
+        y:{ticks:{color:'#8B95A6', font:{family:'IBM Plex Mono', size:11}}, grid:{color:'rgba(255,255,255,0.05)'}, beginAtZero:true}
+      }
+    }
+  });
+}
+
+function renderPosteChart(){
+  const counts = {};
+  records.forEach(r=>{ if(r.poste) counts[r.poste] = (counts[r.poste]||0) + Number(r.quantite||1); });
+  const labels = Object.keys(counts);
+  const data = Object.values(counts);
+  const ctx = document.getElementById('posteChart').getContext('2d');
+  if(posteChartInstance) posteChartInstance.destroy();
+  posteChartInstance = new Chart(ctx, {
+    type:'bar',
+    data:{
+      labels,
+      datasets:[{
+        data,
+        backgroundColor:'#E5484D',
+        borderRadius:4,
+        maxBarThickness:36
+      }]
+    },
+    options:{
+      responsive:true,
+      maintainAspectRatio:false,
+      indexAxis:'y',
+      plugins:{legend:{display:false}},
+      scales:{
+        x:{ticks:{color:'#8B95A6', font:{family:'IBM Plex Mono', size:11}}, grid:{color:'rgba(255,255,255,0.05)'}, beginAtZero:true},
+        y:{ticks:{color:'#8B95A6', font:{family:'IBM Plex Sans', size:11}}, grid:{display:false}}
+      }
+    }
+  });
+}
+
+const PERCENT_COLORS = ['#F4A825','#E5484D','#34C77B','#5B8DEF','#B47CE5','#4FC3D9','#E58A3D','#8B95A6'];
+
+function checkReclamationThreshold(){
+  if(records.length === RECLAMATION_THRESHOLD){
+    showToast(`Seuil de ${RECLAMATION_THRESHOLD} réclamations atteint — analyse en % disponible`);
+  }
+}
+
+function renderProblemPercentChart(){
+  const total = records.length;
+  const sub = document.getElementById('percentPanelSub');
+  const body = document.getElementById('percentPanelBody');
+
+  if(total < RECLAMATION_THRESHOLD){
+    sub.textContent = `En attente — ${total}/${RECLAMATION_THRESHOLD} réclamations`;
+    if(percentChartInstance){ percentChartInstance.destroy(); percentChartInstance = null; }
+    body.innerHTML = `<div class="progress-note">Encore <b>${RECLAMATION_THRESHOLD - total}</b> réclamation(s) avant le déclenchement automatique de l'analyse par pourcentage (basée sur ${RECLAMATION_THRESHOLD} fiches).</div>`;
+    return;
+  }
+
+  sub.textContent = `${total} réclamations analysées`;
+  if(!document.getElementById('percentChartCanvas')){
+    body.innerHTML = `
+      <div class="percent-chart-wrap">
+        <div class="chart-inner"><canvas id="percentChartCanvas"></canvas></div>
+        <div class="percent-legend" id="percentLegend"></div>
+      </div>`;
+  }
+
+  const counts = {};
+  records.forEach(r=>{
+    const key = r.problemeType || (r.defaut ? r.defaut.split(' — ')[0] : 'Autre');
+    counts[key] = (counts[key]||0) + 1;
+  });
+  const labels = Object.keys(counts);
+  const values = labels.map(l=>counts[l]);
+  const colors = labels.map((_,i)=>PERCENT_COLORS[i % PERCENT_COLORS.length]);
+
+  const ctx = document.getElementById('percentChartCanvas').getContext('2d');
+  if(percentChartInstance) percentChartInstance.destroy();
+  percentChartInstance = new Chart(ctx, {
+    type:'doughnut',
+    data:{ labels, datasets:[{ data:values, backgroundColor:colors, borderColor:'#1B212C', borderWidth:2 }] },
+    options:{
+      responsive:true,
+      maintainAspectRatio:false,
+      plugins:{
+        legend:{ display:false },
+        tooltip:{
+          callbacks:{
+            label:(ctx)=>{
+              const pct = ((ctx.parsed / total) * 100).toFixed(1);
+              return `${ctx.label}: ${ctx.parsed} (${pct}%)`;
+            }
+          }
+        }
+      }
+    }
+  });
+
+  document.getElementById('percentLegend').innerHTML = labels.map((l,i)=>{
+    const pct = ((values[i] / total) * 100).toFixed(1);
+    return `<div class="percent-legend-row">
+      <span class="percent-legend-dot" style="background:${colors[i]}"></span>
+      <span class="percent-legend-label">${escapeHtml(l)}</span>
+      <span class="percent-legend-value">${values[i]} — ${pct}%</span>
+    </div>`;
+  }).join('');
+}
+
+function renderMatrix(){
+  const body = document.getElementById('matrixBody');
+  const empty = document.getElementById('matrixEmpty');
+  const pairs = {};
+  records.forEach(r=>{
+    if(!r.defaut || !r.poste) return;
+    const key = r.defaut + '|||' + r.poste;
+    if(!pairs[key]) pairs[key] = {defaut:r.defaut, poste:r.poste, count:0, qty:0};
+    pairs[key].count += 1;
+    pairs[key].qty += Number(r.quantite||0);
+  });
+  const rows = Object.values(pairs).sort((a,b)=>b.count-a.count);
+  if(rows.length===0){
+    body.innerHTML='';
+    empty.style.display='block';
+    return;
+  }
+  empty.style.display='none';
+  body.innerHTML = rows.map(p=>`
+    <tr>
+      <td>${escapeHtml(p.defaut)}</td>
+      <td>${escapeHtml(p.poste)}</td>
+      <td class="matrix-count">${p.count}</td>
+      <td class="mono">${p.qty}</td>
+    </tr>
+  `).join('');
+}
+
+function suggestPosteForDefaut(defautValue){
+  const val = defautValue.trim().toLowerCase();
+  if(!val) return null;
+  const counts = {};
+  records.forEach(r=>{
+    if(r.defaut && r.poste && r.defaut.trim().toLowerCase()===val){
+      counts[r.poste] = (counts[r.poste]||0)+1;
+    }
+  });
+  let best = null, bestCount = 0;
+  Object.entries(counts).forEach(([p,c])=>{ if(c>bestCount){ best=p; bestCount=c; } });
+  return best;
+}
+
+function render(){
+  renderKPIs();
+  renderTable();
+  renderChart();
+  renderPosteChart();
+  renderProblemPercentChart();
+  renderMatrix();
+  refreshDatalists();
+  updateTicketPreview();
+}
+
+// ---- Cascade : Capacité -> Modèle -> Matériau ----
+const capaciteEl = document.getElementById('f-capacite');
+const modeleEl = document.getElementById('f-modele');
+const materiauEl = document.getElementById('f-materiau');
+const problemeEl = document.getElementById('f-probleme');
+const variationEl = document.getElementById('f-variation');
+
+function populateSelect(el, options, placeholder){
+  el.innerHTML = `<option value="">${placeholder}</option>` + options.map(o=>`<option value="${escapeHtml(o)}">${escapeHtml(o)}</option>`).join('');
+}
+
+populateSelect(capaciteEl, Object.keys(MACHINE_TREE), 'Capacité…');
+populateSelect(problemeEl, Object.keys(DEFAUT_TREE), 'Problème…');
+
+function resetMateriau(){
+  populateSelect(materiauEl, [], 'Matériau…');
+  materiauEl.disabled = true;
+  materiauEl.required = false;
+  materiauEl.value = '';
+}
+function resetModele(){
+  populateSelect(modeleEl, [], 'Modèle…');
+  modeleEl.disabled = true;
+  modeleEl.value = '';
+  resetMateriau();
+}
+function resetVariation(){
+  populateSelect(variationEl, [], 'Variation…');
+  variationEl.disabled = true;
+  variationEl.required = false;
+  variationEl.value = '';
+}
+
+capaciteEl.addEventListener('change', ()=>{
+  const cap = capaciteEl.value;
+  if(!cap){ resetModele(); return; }
+  populateSelect(modeleEl, Object.keys(MACHINE_TREE[cap].models), 'Modèle…');
+  modeleEl.disabled = false;
+  resetMateriau();
+});
+
+modeleEl.addEventListener('change', ()=>{
+  const cap = capaciteEl.value;
+  const mod = modeleEl.value;
+  if(!cap || !mod){ resetMateriau(); return; }
+  const materials = MACHINE_TREE[cap].models[mod].materials;
+  if(!materials){
+    populateSelect(materiauEl, [], 'Sans objet');
+    materiauEl.disabled = true;
+    materiauEl.required = false;
+  }else if(materials.length===1){
+    populateSelect(materiauEl, materials, 'Matériau…');
+    materiauEl.value = materials[0];
+    materiauEl.disabled = true;
+    materiauEl.required = false;
+  }else{
+    populateSelect(materiauEl, materials, 'Matériau…');
+    materiauEl.disabled = false;
+    materiauEl.required = true;
+  }
+});
+
+problemeEl.addEventListener('change', ()=>{
+  const p = problemeEl.value;
+  if(!p){ resetVariation(); return; }
+  populateSelect(variationEl, DEFAUT_TREE[p], 'Variation…');
+  variationEl.disabled = false;
+  variationEl.required = true;
+});
+
+variationEl.addEventListener('change', ()=>{
+  const posteField = document.getElementById('f-poste');
+  const hint = document.getElementById('posteHint');
+  if(posteField.value.trim()) return; // ne pas écraser une saisie manuelle
+  const suggestion = suggestPosteForDefaut(buildDefautLabel());
+  if(suggestion){
+    posteField.value = suggestion;
+    hint.classList.add('show');
+  }else{
+    hint.classList.remove('show');
+  }
+});
+
+function buildArticleLabel(){
+  const cap = capaciteEl.value, mod = modeleEl.value, mat = materiauEl.value;
+  if(!cap || !mod) return '';
+  return mat ? `${cap} — ${mod} (${mat})` : `${cap} — ${mod}`;
+}
+function buildDefautLabel(){
+  const p = problemeEl.value, v = variationEl.value;
+  if(!p) return '';
+  return v ? `${p} — ${v}` : p;
+}
+
+document.getElementById('defectForm').addEventListener('submit', async (e)=>{
+  e.preventDefault();
+  const payload = {
+    date: document.getElementById('f-date').value,
+    matriculeControleur: document.getElementById('f-matricule-controleur').value.trim(),
+    matriculeOperateur: document.getElementById('f-matricule-operateur').value.trim(),
+    capacite: capaciteEl.value,
+    modele: modeleEl.value,
+    materiau: materiauEl.value || null,
+    article: buildArticleLabel(),
+    problemeType: problemeEl.value,
+    variation: variationEl.value,
+    defaut: buildDefautLabel(),
+    poste: document.getElementById('f-poste').value.trim(),
+    quantite: Number(document.getElementById('f-quantite').value),
+  };
+  const submitBtn = e.target.querySelector('button[type="submit"]');
+  submitBtn.disabled = true;
+  try{
+    const res = await fetch(API_BASE, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify(payload)
+    });
+    if(!res.ok) throw new Error('HTTP ' + res.status);
+    const record = await res.json();
+    records.push(record);
+    showToast(`Fiche N° ${pad(record.id)} enregistrée avec succès`);
+    checkReclamationThreshold();
+    e.target.reset();
+    document.getElementById('f-date').value = todayStr();
+    document.getElementById('f-quantite').value = 1;
+    document.getElementById('posteHint').classList.remove('show');
+    resetModele();
+    resetVariation();
+    render();
+  }catch(err){
+    alert("Erreur d'enregistrement. Vérifiez la connexion Wi-Fi (Technical Plastic) et réessayez.");
+  }finally{
+    submitBtn.disabled = false;
+  }
+});
+
+function openResolveModal(id){
+  const rec = records.find(r=>r.id===id);
+  if(!rec) return;
+  const root = document.getElementById('modalRoot');
+  root.innerHTML = `
+    <div class="modal-backdrop" onclick="if(event.target===this) closeModal()">
+      <div class="modal">
+        <h3>Clôturer la fiche N° ${pad(id)}</h3>
+        <div class="sub">${escapeHtml(rec.article)} — ${escapeHtml(rec.defaut)}</div>
+        <label for="m-temps">Temps de réparation (minutes)</label>
+        <input type="number" id="m-temps" min="1" placeholder="ex: 25" required>
+        <label for="m-visa">Visa contrôleur final (matricule)</label>
+        <input type="text" id="m-visa" placeholder="ex: C-007" required>
+        <div class="modal-actions">
+          <button class="btn-ghost" onclick="closeModal()">Annuler</button>
+          <button class="btn-resolve" onclick="confirmResolve(${id})">Valider &amp; tamponner</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function closeModal(){
+  document.getElementById('modalRoot').innerHTML = '';
+}
+
+async function confirmResolve(id){
+  const temps = document.getElementById('m-temps').value;
+  const visa = document.getElementById('m-visa').value.trim();
+  if(!temps || !visa){ return; }
+  try{
+    const res = await fetch(`${API_BASE}/${id}/resolve`, {
+      method: 'PATCH',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ tempsReparation: Number(temps), visaControleurFinal: visa })
+    });
+    if(!res.ok) throw new Error('HTTP ' + res.status);
+    const updated = await res.json();
+    const idx = records.findIndex(r=>r.id===id);
+    if(idx!==-1) records[idx] = updated;
+    showToast(`Fiche N° ${pad(id)} clôturée et enregistrée`);
+    closeModal();
+    render();
+  }catch(err){
+    alert("Erreur lors de la clôture. Vérifiez la connexion Wi-Fi (Technical Plastic) et réessayez.");
+  }
+}
+
+async function deleteRecord(id){
+  if(!confirm('Supprimer définitivement cette fiche ?')) return;
+  try{
+    const res = await fetch(`${API_BASE}/${id}`, { method: 'DELETE' });
+    if(!res.ok && res.status!==204) throw new Error('HTTP ' + res.status);
+    records = records.filter(r=>r.id!==id);
+    render();
+  }catch(err){
+    alert("Erreur lors de la suppression. Vérifiez la connexion Wi-Fi (Technical Plastic) et réessayez.");
+  }
+}
+
+async function confirmSaved(id){
+  try{
+    const res = await fetch(`${API_BASE}/${id}/confirm`, { method: 'PATCH' });
+    if(!res.ok) throw new Error('HTTP ' + res.status);
+    const updated = await res.json();
+    const idx = records.findIndex(r=>r.id===id);
+    if(idx!==-1) records[idx] = updated;
+    showToast(`Fiche N° ${pad(id)} confirmée — toutes les infos sont enregistrées`);
+    render();
+  }catch(err){
+    alert("Erreur lors de la confirmation. Vérifiez la connexion Wi-Fi (Technical Plastic) et réessayez.");
+  }
+}
+
+document.getElementById('filter-status').addEventListener('change', renderTable);
+document.getElementById('filter-search').addEventListener('input', renderTable);
+
+document.getElementById('f-date').value = todayStr();
+loadRecords();
+</script>
+</body>
+</html>

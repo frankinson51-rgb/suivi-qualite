@@ -1,0 +1,15 @@
+{
+  "name": "suivi-qualite",
+  "version": "1.0.0",
+  "description": "Suivi Qualite - Ligne Lavage - serveur local avec PostgreSQL",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "initdb": "node db/init.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "pg": "^8.12.0",
+    "dotenv": "^16.4.5"
+  }
+}
